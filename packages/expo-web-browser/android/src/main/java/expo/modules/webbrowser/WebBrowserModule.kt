@@ -186,7 +186,7 @@ class WebBrowserModule : Module() {
       if (session == null && !TextUtils.isEmpty(packageName)) {
         intent.setPackage(packageName)
       }
-      if (session != null) {
+      if (session != null && options.keepAppAlive) {
         intent.putExtra(
           EXTRA_KEEP_ALIVE,
           Intent().setClassName(context.packageName, KeepAliveService::class.java.name)
@@ -196,6 +196,9 @@ class WebBrowserModule : Module() {
   }
 
   private fun keepAlivePackageNameOrNull(options: OpenBrowserOptions): String? {
+    if (!options.keepAppAlive) {
+      return null
+    }
     return try {
       givenOrPreferredPackageName(options.browserPackage)
     } catch (_: NoPreferredPackageFound) {

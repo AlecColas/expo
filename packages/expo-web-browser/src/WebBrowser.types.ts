@@ -65,6 +65,28 @@ export type WebBrowserOpenOptions = {
    */
   useProxyActivity?: boolean;
   /**
+   * A boolean determining whether the browser should keep your app alive while the Custom Tab
+   * is open. Without it, Android can kill your app while the tab covers it, for example when the
+   * device is low on memory. The redirect back to your app then cold-starts it, and the result of
+   * [`openAuthSessionAsync`](#webbrowseropenauthsessionasyncurl-redirecturl-options) is lost.
+   *
+   * The browser keeps your app alive by binding to a service of your app, which raises its process
+   * priority while the tab is open. With Chrome, when it has not been warmed up yet, opening the tab
+   * first waits for Chrome to warm up (up to 2 seconds). Call
+   * [`warmUpAsync`](#webbrowserwarmupasyncbrowserpackage) beforehand to avoid that wait.
+   * Browsers that do not support this request ignore it.
+   *
+   * Keep it `true` for authentication and for any flow that waits for a redirect or a result.
+   * Set it to `false` when your app does not need to come back to the same process after the tab
+   * closes, for example to show a help page or terms of service with `openBrowserAsync`. The tab
+   * then opens without waiting for the browser, and Android can reclaim your app's memory while
+   * the user browses.
+   *
+   * @default true
+   * @platform android
+   */
+  keepAppAlive?: boolean;
+  /**
    * Tint color for controls in SKSafariViewController. Supports React Native [color formats](https://reactnative.dev/docs/colors).
    * @platform ios
    */

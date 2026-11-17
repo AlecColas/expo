@@ -18,7 +18,9 @@ import io.mockk.slot
 import io.mockk.verify
 import junit.framework.ComparisonFailure
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -222,6 +224,58 @@ internal class WebBrowserModuleTest {
     val keepAlive = intentSlot.captured.intent.getParcelableExtra<Intent>(KEEP_ALIVE_EXTRA)
     assertEquals(KeepAliveService::class.java.name, keepAlive?.component?.className)
     assertNotNull(intentSlot.captured.intent.extras?.getBinder(CustomTabsIntent.EXTRA_SESSION))
+  }
+
+  @Test
+  fun `test intent does not ask the browser to keep the app alive when keepAppAlive is false`() = withWebBrowserMock {
+    // given
+    val intentSlot = slot<CustomTabsIntent>()
+    val activitiesHelper = mockkCustomTabsActivitiesHelper(defaultCanResolveIntent = true, startIntentSlot = intentSlot)
+    val session = CustomTabsSession.createMockSessionForTesting(
+      ComponentName("com.browser.package", "CustomTabsService")
+    )
+    val connectionHelper = mockkCustomTabsConnectionHelper(keepAliveSession = session)
+    initialize(moduleSpy, customTabsActivitiesHelper = activitiesHelper, customTabsConnectionHelper = connectionHelper)
+
+    // when
+    module.openBrowserAsync("http://expo.io", OpenBrowserOptions(browserPackage = "com.browser.package", keepAppAlive = false))
+
+    // then
+    verify(exactly = 0) { connectionHelper.requestKeepAliveSession(any(), any()) }
+    assertFalse(intentSlot.captured.intent.hasExtra(KEEP_ALIVE_EXTRA))
+    assertNull(intentSlot.captured.intent.extras?.getBinder(CustomTabsIntent.EXTRA_SESSION))
+    assertEquals("com.browser.package", intentSlot.captured.intent.`package`)
+  }
+
+  @Test
+  fun `authentication headers keep the app alive unless keepAppAlive is false`() = withWebBrowserMock {
+    for (keepAppAlive in listOf(true, false)) {
+      // given
+      val intentSlot = slot<CustomTabsIntent>()
+      val activities = mockkCustomTabsActivitiesHelper(
+        preferredActivity = "com.preferred.browser",
+        startIntentSlot = intentSlot,
+        defaultCanResolveIntent = true
+      )
+      val connection = mockkCustomTabsConnectionHelper()
+      val session = CustomTabsSession.createMockSessionForTesting(
+        ComponentName("com.preferred.browser", "CustomTabsService")
+      )
+      every { connection.openWithHeaders(any(), any(), any(), any()) } answers {
+        thirdArg<Promise>().resolve(arg<(CustomTabsSession) -> Bundle>(3)(session))
+      }
+      initialize(moduleSpy, activities, connection)
+
+      // when
+      module.openBrowserAsync(
+        "https://auth.example/start",
+        OpenBrowserOptions(additionalHeaderFields = mapOf("X-Test" to "example"), keepAppAlive = keepAppAlive)
+      )
+
+      // then
+      assertNotNull(intentSlot.captured.intent.extras?.getBinder(CustomTabsIntent.EXTRA_SESSION))
+      assertEquals(keepAppAlive, intentSlot.captured.intent.hasExtra(KEEP_ALIVE_EXTRA))
+    }
   }
 
   @Test
